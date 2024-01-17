@@ -1,7 +1,7 @@
-from fastapi import FastAPI
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel  # Capacidad de crear una entidad (proporciona un constructor sin necesidad de crearlo nosotros mismos)
 
-app = FastAPI()
+router_user = APIRouter(tags=["users"])
 
 # todo          -----------------
 # todo           GET DE USUARIOS
@@ -22,11 +22,11 @@ users_list = [  User(id = 1, name = "Roberto", surname = "Díaz", age = 44, url 
                 User(id = 4, name = "Darío", surname = "Díaz", age = 44, url = "https://ddd.com")
             ]
 
-@app.get("/usersJson")
+@router_user.get("/usersJson")
 async def usersJson():
     return {"name": "Roberto", "surname": "Díaz", "age": 44, "url": "https://rdo.com"}
 
-@app.get("/users")
+@router_user.get("/users")
 async def users():
     return users_list   # FastAPI lo convierte automáticamente en JSON 
 
@@ -36,13 +36,14 @@ async def users():
 # todo          ------------------------
 
     # Búsqueda de usuarios a través del path
-@app.get("/user/{id}")
+@router_user.get("/user/{id}")
 async def searchUser(id: int):
     users = filter(lambda argumento: argumento.id == id, users_list)
     try:
         return list(users)[0]
     except:
-        return {"error": "Registro no encontrado en base de datos"}
+        raise HTTPException(status_code=204, detail="Registro no encontrado en base de datos")
+        # return {"error": "Registro no encontrado en base de datos"}
     
     # La búsqueda en navegador o consumidor de API sería:
     #       127.0.0.1:8000/user/3
@@ -53,7 +54,7 @@ async def searchUser(id: int):
 # todo          -------------------------
 
     # Búsqueda de usuarios a través de query
-@app.get("/userQuery")
+@router_user.get("/userQuery")
 async def searchUser(id: int):
     return searchUser(id)
     
@@ -66,15 +67,15 @@ async def searchUser(id: int):
 # todo           POST (create)
 # todo          ---------------
 
-@app.post("/user")
+@router_user.post("/user", response_model= User, status_code = 201)
 async def newUser(user: User):
     if type(searchUser(user.id)) == User:
-        return {"error": "Registro ya existente"}
-    else:
-        users_list.append(user)
+        raise HTTPException(status_code=204, detail="Registro ya existente")
+    users_list.append(user)
+    return user
         
         
-# Nota: Lo más correcto sería crear una función externa que sería llamada en la función async del decorador (Se evita la duplicidad de código)
+# Nota: Lo más correcto sería crear una función externa que fuera llamada en la función async del decorador (Se evita la duplicidad de código)
 def searchUser(id: int):
     users = filter(lambda user: user.id == id, users_list)
     try:
@@ -87,7 +88,7 @@ def searchUser(id: int):
 # todo           PUT (actualizar)
 # todo          ------------------
                 # Con PUT se actualiza el registro completo (tanto la parte modificada como la parte que no)
-@app.put("/user")
+@router_user.put("/user")
 async def updateUser(user: User):
     found = False
     
@@ -106,7 +107,7 @@ async def updateUser(user: User):
 # todo           DELETE (eliminar)
 # todo          ------------------
 
-@app.delete("/user/{id}")
+@router_user.delete("/user/{id}")
 async def deleteUser(id: int):
     found = 0
     
@@ -119,3 +120,43 @@ async def deleteUser(id: int):
         return {"error": "Registro no eliminado"}
     
     return {"success": "Registro eliminado con éxito"}
+
+
+# todo          -------------------
+# todo           HTTP STATUS CODES
+# todo          -------------------
+
+        # Se pueden controlar los códigos HTTP retornados en las peticiones
+        
+        # En decorador añadir parámetro "status_code=xxx"
+        #   Ej. @app.post("/user", status_code=201)
+        
+        # EJEMPLO DE USO: líneas 45, 70, 72.
+
+
+# todo          --------
+# todo           ROUTES
+# todo          --------
+
+        # Server iniciado en fichero principal ("main.py"). 
+        # En fichero principal se enruta hacía las distintas páginas existentes:
+        #    Se utiliza método de la clase FastAPI .include_rotuer()
+        
+        # EJEMPLO DE USO: 
+        #                  1º. fichero "products.py" líneas: 1, 3, 4
+        #                  2º. fichero "main.py" líneas: 4, 9, 10
+        
+
+# todo          --------------------
+# todo           RECURSOS ESTÁTICOS
+# todo          --------------------
+
+                # Rutas para mostrar por ejemplo imágenes.
+                # Fichero "main.py" líneas: 5, 13
+
+
+# todo          --------------------
+# todo           AUTORIZACIÓN OAUTH2
+# todo          --------------------
+
+                # Ver fichero "routes/auth_basic_users.py"
