@@ -22,7 +22,7 @@ users_list = [  User(id = 1, name = "Roberto", surname = "Díaz", age = 44, url 
                 User(id = 4, name = "Darío", surname = "Díaz", age = 44, url = "https://ddd.com")
             ]
 
-@router_user.get("/usersJson")
+@router_user.get("/usersJson")      ## función de prueba
 async def usersJson():
     return {"name": "Roberto", "surname": "Díaz", "age": 44, "url": "https://rdo.com"}
 
