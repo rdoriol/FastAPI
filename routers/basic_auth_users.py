@@ -48,12 +48,12 @@ def searchUser(username: str):
 async def currentToken(token: str = Depends(oauth2)):
     user = searchUser(token)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales de autenticación inválidas", header={"WWW-Authenticate": "Bearer"})
-    
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales de autenticación inválidas")#, header={"WWW-Authenticate": "Bearer"})
+        
     if user.disabled:
         return "Usuario desactivado"
     
-    return user
+    return "llega"
 
 
 @app.post("/login")
@@ -78,5 +78,8 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
     # Método para devolver el token generado en login()
 @app.get("/users/me")
 async def me(user: User = Depends(currentToken)):
-    return user
+    try:
+        return user
+    except:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.\nPATH: /users/me")
     
