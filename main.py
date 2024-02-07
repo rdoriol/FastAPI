@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from typing import Union
 
-from routers import products, users, jwt_auth_users
+from routers import products, users, jwt_auth_users, users_mongoDB
 from fastapi.staticfiles import StaticFiles     # para recursos estáticos
 
 app = FastAPI()
@@ -10,6 +10,7 @@ app = FastAPI()
 app.include_router(products.router_products)
 app.include_router(users.router_user)
 app.include_router(jwt_auth_users.router_jwt)
+app.include_router(users_mongoDB.router_userdb)
 
 app.mount("/static", StaticFiles(directory="static"), name="mi_imagen_estática")
 
