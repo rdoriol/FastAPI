@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 from db_mongo.models.user import User      # Se importa modelo de la clase User ubicado en db_mongo/models/user.py
 from db_mongo.client import db_client       # Se importa fichero para conectar con la BBDD.
-from db_mongo.schemas.user import user_schema
+from db_mongo.schemas.user import user_schema, users_schema
+from bson import ObjectId   # Clase para crear objetos id, necesario para trabajar con _id generado auto por mongoDB
 
 router_userdb = APIRouter(prefix= "/usersdb", tags=["users"])
 
@@ -9,15 +10,11 @@ router_userdb = APIRouter(prefix= "/usersdb", tags=["users"])
 # todo           GET DE USUARIOS
 # todo          -----------------
 
-    
-    # Lista para utilizar como si fuera una base de datos y poder hacer CRUD
-users_list = []
 
-
-@router_userdb.get("/")
+@router_userdb.get("/", response_model= list[User])
 async def users():
     
-    return user_schema(db_client.local.users.find()) # todo SOLUCIONAR   # FastAPI lo convierte automáticamente en JSON 
+    return users_schema(db_client.users.find())
 
 
 # todo          ------------------------
@@ -25,17 +22,15 @@ async def users():
 # todo          ------------------------
 
     # Búsqueda de usuarios a través del path
-@router_userdb.get("/{id}")
-async def searchUser(id: int):
-    users = filter(lambda argumento: argumento.id == id, users_list)
+@router_userdb.get("/{username}")
+async def searchUser(username: str):
+    user = searchUserDB("username", username)
     try:
-        return list(users)[0]
+        return user
     except:
         raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail="Registro no encontrado en base de datos")
-        # return {"error": "Registro no encontrado en base de datos"}
-    
     # La búsqueda en navegador o consumidor de API sería:
-    #       127.0.0.1:8000/user/3
+    #       127.0.0.1:8000/usersdb/3
     
     
 # todo          -------------------------
@@ -43,12 +38,17 @@ async def searchUser(id: int):
 # todo          -------------------------
 
     # Búsqueda de usuarios a través de query
-@router_userdb.get("/userdbQuery")
-async def searchUser(id: int):
-    return searchUser(id)
+@router_userdb.get("/usersdbQuery")
+async def searchUser(username: str):
+    
+    user = searchUserDB("username", username)
+    try:
+        return user
+    except:
+        raise HTTPException(status_code= status.HTTP_404_NOT_FOUND, detail= "Registro no encontrado en BBDD")
     
     # La búsqueda en navegador o consumidor de API sería:
-    #       127.0.0.1:8000/userQuery/?id=2
+    #       127.0.0.1:8000/userQuery/?username=rdoriol
     
 
  
@@ -71,7 +71,7 @@ async def newUserDB(user: User):
     
         # Conectar con BBDD, clase instanciada db_client y llamar a método para introducir un registro (con formato de diccionario)
         # En la siguiente línea, al mísmo tiempo se inserta registro en BBDD y se almacena en variable id el _id generado de forma auto por MongoDB
-    id = db_client.local.users.insert_one(user_dict).inserted_id
+    id = db_client.users.insert_one(user_dict).inserted_id
     
         # Para retornar el regitro completo del usuario se realiza una búsqueda en la BBDD. Para la búsqueda se utiliza el método user_schema con el _id
     new_user = user_schema(db_client.local.users.find_one({"_id": id}))
@@ -83,10 +83,10 @@ async def newUserDB(user: User):
     # Nota: Lo más correcto sería crear una función externa que fuera llamada en la función async del decorador (Se evita la duplicidad de código)
 def searchUserDB(field: str, key):
     try:
-        user = db_client.local.users.find_one({field: key})
+        user = db_client.users.find_one({field: key})
         return User(**user_schema(user))
     except:
-        return {"error": "No se encuentra usuario en BBDD"}
+        return {"error": "No se encuentra usuario en BBDD pepe"}
 
     
 
@@ -96,34 +96,31 @@ def searchUserDB(field: str, key):
                 # Con PUT se actualiza el registro completo (tanto la parte modificada como la parte que no)
 @router_userdb.put("/")
 async def updateUser(user: User):
-    found = False
     
-    for index, savedUser in enumerate(users_list):
-        if savedUser.id == user.id:
-            users_list[index] = user
-            found = True
+    user_dict = dict(user)
+    del user_dict["id"]
     
-    if not found:
-        return{"error": "Registro no actualizado"}    
+    try:
+        db_client.users.find_one_and_replace({"username": user_dict["username"]}, user_dict)
+                
+    except:
+        return {"error": "No se ha actualizado el usuario"}
     
-    return user
+    return searchUserDB("username", user.username)
+    
 
 
 # todo          ------------------
 # todo           DELETE (eliminar)
 # todo          ------------------
 
-@router_userdb.delete("/{id}")
-async def deleteUser(id: int):
-    found = 0
-    
-    for index, deleteUser in enumerate(users_list):
-        if deleteUser.id == id:
-            del users_list[index]
-            found = 1
+@router_userdb.delete("/{username}", status_code= status.HTTP_204_NO_CONTENT)
+async def deleteUser(username: str):
+  
+    found = db_client.users.find_one_and_delete({"username": username}) 
     
     if not found:
-        return {"error": "Registro no eliminado"}
+        return {"error": "Usuario no encontrado. Registro no eliminado"}
     
     return {"success": "Registro eliminado con éxito"}
 
